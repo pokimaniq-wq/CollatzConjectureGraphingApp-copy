@@ -1,0 +1,10 @@
+{
+  "description": "Visualize the 3x+1 problem with interactive charts, download options, and animated videos, perfect for math enthusiasts and educators.",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  }
+}
