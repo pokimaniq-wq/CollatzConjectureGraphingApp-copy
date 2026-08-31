@@ -21,6 +21,15 @@ import { THEMES, hexToRgb, rgbToHex, type Theme } from "./utils/themes";
 
 let nextId = 1;
 
+type ThemeColorKey = "bg" | "bgPanel" | "text" | "accent";
+
+const THEME_COLOR_FIELDS: Array<{ key: ThemeColorKey; label: string; description: string }> = [
+  { key: "bg", label: "Canvas", description: "Page background" },
+  { key: "bgPanel", label: "Panels", description: "Cards and settings" },
+  { key: "text", label: "Text", description: "Primary copy" },
+  { key: "accent", label: "Accent", description: "Controls and highlights" },
+];
+
 function downloadBlob(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -122,6 +131,9 @@ function SettingsPanel({
   onClose,
   theme,
   onThemeChange,
+  themeOverrides,
+  onThemeColorChange,
+  onThemeReset,
   sequences,
   onColorChange,
   t,
@@ -130,6 +142,9 @@ function SettingsPanel({
   onClose: () => void;
   theme: string;
   onThemeChange: (key: string) => void;
+  themeOverrides: Partial<Pick<Theme, ThemeColorKey>>;
+  onThemeColorChange: (key: ThemeColorKey, color: string) => void;
+  onThemeReset: () => void;
   sequences: CollatzSequence[];
   onColorChange: (id: number, hex: string) => void;
   t: Theme;
@@ -224,6 +239,61 @@ function SettingsPanel({
             </div>
           </section>
 
+          {/* Theme customizer */}
+          <section>
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <p
+                  className="text-[10px] font-mono uppercase tracking-widest"
+                  style={{ color: t.textMuted }}
+                >
+                  Theme customizer
+                </p>
+                <p className="text-[10px] font-mono mt-1" style={{ color: t.textDim }}>
+                  Fine-tune the active preset.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={onThemeReset}
+                disabled={Object.keys(themeOverrides).length === 0}
+                className="text-[10px] font-mono px-2 py-1 rounded border transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                style={{ borderColor: t.borderAccent, color: t.textMuted }}
+              >
+                Reset
+              </button>
+            </div>
+
+            <div className="space-y-2">
+              {THEME_COLOR_FIELDS.map(({ key, label, description }) => (
+                <label
+                  key={key}
+                  className="flex items-center gap-3 rounded-md border px-3 py-2 cursor-pointer"
+                  style={{ borderColor: t.border, background: t.bgInput }}
+                >
+                  <input
+                    aria-label={`${label} color`}
+                    type="color"
+                    value={t[key]}
+                    onChange={(event) => onThemeColorChange(key, event.target.value)}
+                    className="h-7 w-7 shrink-0 cursor-pointer rounded border-0 bg-transparent p-0"
+                  />
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-xs font-mono" style={{ color: t.text }}>
+                      {label}
+                    </span>
+                    <span className="block text-[10px] font-mono" style={{ color: t.textDim }}>
+                      {description}
+                    </span>
+                  </span>
+                  <span className="text-[10px] font-mono uppercase" style={{ color: t.textMuted }}>
+                    {t[key]}
+                  </span>
+                </label>
+              ))}
+            </div>
+          </section>
+
           {/* Line colors */}
           {sequences.length > 0 && (
             <section>
@@ -299,15 +369,17 @@ export default function App() {
   const [isExporting, setIsExporting] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [themeKey, setThemeKey] = useState("oscilloscope");
+  const [themeOverrides, setThemeOverrides] = useState<Partial<Pick<Theme, ThemeColorKey>>>({});
 
   const chartRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const inputId = useId();
 
-  const t = useMemo(
+  const baseTheme = useMemo(
     () => THEMES.find((th) => th.key === themeKey) ?? THEMES[0],
     [themeKey]
   );
+  const t = useMemo(() => ({ ...baseTheme, ...themeOverrides }), [baseTheme, themeOverrides]);
   const CustomTooltip = useMemo(() => makeTooltip(t), [t]);
 
   const maxTerms = useMemo(
@@ -365,6 +437,17 @@ export default function App() {
       prev.map((s) => (s.id === id ? { ...s, color: hex } : s))
     );
   }, []);
+
+  const chooseTheme = useCallback((key: string) => {
+    setThemeKey(key);
+    setThemeOverrides({});
+  }, []);
+
+  const updateThemeColor = useCallback((key: ThemeColorKey, color: string) => {
+    setThemeOverrides((previous) => ({ ...previous, [key]: color }));
+  }, []);
+
+  const resetThemeCustomizer = useCallback(() => setThemeOverrides({}), []);
 
   const exportJSON = () => {
     const data: JSONExport = {
@@ -836,7 +919,10 @@ export default function App() {
         open={settingsOpen}
         onClose={() => setSettingsOpen(false)}
         theme={themeKey}
-        onThemeChange={setThemeKey}
+        onThemeChange={chooseTheme}
+        themeOverrides={themeOverrides}
+        onThemeColorChange={updateThemeColor}
+        onThemeReset={resetThemeCustomizer}
         sequences={sequences}
         onColorChange={updateColor}
         t={t}
